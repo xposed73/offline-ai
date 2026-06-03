@@ -158,6 +158,32 @@
             </svg>
           </a>
         </div>
+
+        <!-- RAGFlow Card -->
+        <div class="service-card" id="card-ragflow">
+          <div class="card-status-badge status-checking" id="badge-ragflow">
+            <span class="status-dot"></span>
+            <span class="status-text">Checking</span>
+          </div>
+          <div class="service-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="5" r="3"/>
+              <circle cx="5" cy="19" r="3"/>
+              <circle cx="19" cy="19" r="3"/>
+              <path d="M5 16l5.5-8M19 16l-5.5-8"/>
+            </svg>
+          </div>
+          <h4>RAG Engine</h4>
+          <span class="service-sub">RAGFlow Platform</span>
+          <p>Enterprise-grade Retrieval-Augmented Generation & Agent platform. Upload documents, extract knowledge with visual chunking, and orchestrate complex AI workflows.</p>
+          <a href="http://localhost:8000" target="_blank" class="btn btn-secondary">
+            <span>Launch RAGFlow</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+          </a>
+        </div>
       </div>
     </section>
 
@@ -201,13 +227,7 @@
             </svg>
             <span>Voice Models</span>
           </button>
-          <button class="tab-btn" id="tab-btn-knowledge" onclick="switchTab('knowledge')">
-            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-            </svg>
-            <span>Knowledge Base</span>
-          </button>
+
         </div>
 
         <div id="tab-llm" class="tab-pane active">
@@ -280,86 +300,7 @@
           </div>
         </div>
 
-        <!-- Knowledge Base Tab Pane -->
-        <div id="tab-knowledge" class="tab-pane" style="display: none;">
-          <div class="kb-setup-notice" id="kb-setup-notice" style="display:none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kb-notice-icon">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <div>
-              <strong>One-time setup required</strong>
-              <p>Please <a href="http://localhost:3000" target="_blank" id="kb-webui-link">open Open WebUI</a> and create your admin account first. Then come back and refresh this page.</p>
-            </div>
-          </div>
 
-          <div class="kb-grid-layout">
-            <!-- Collections List Card -->
-            <div class="models-list-card">
-              <div class="kb-card-header">
-                <h4>Knowledge Collections</h4>
-                <button class="btn btn-primary btn-small" id="btn-show-create-kb" onclick="toggleCreateKb()">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
-                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
-                  <span>New Collection</span>
-                </button>
-              </div>
-              <p class="section-desc">Upload PDFs to a collection. In the chat, type <code>#CollectionName</code> to use it.</p>
-
-              <!-- Create KB inline form -->
-              <div id="create-kb-form" style="display:none;" class="create-kb-form">
-                <input type="text" id="new-kb-name" placeholder="e.g. Company Manuals" maxlength="64">
-                <input type="text" id="new-kb-desc" placeholder="Description (optional)">
-                <div class="create-kb-actions">
-                  <button class="btn btn-primary btn-small" onclick="createKnowledgeBase()">Create</button>
-                  <button class="btn btn-secondary btn-small" onclick="toggleCreateKb()">Cancel</button>
-                </div>
-              </div>
-
-              <div class="models-list" id="kb-collections-list">
-                <div class="kb-loading">Loading collections...</div>
-              </div>
-            </div>
-
-            <!-- Upload PDF Card -->
-            <div class="custom-download-card">
-              <h4>Upload PDF</h4>
-              <p class="section-desc">Select a collection, then drag & drop or choose a PDF file to index into the knowledge base.</p>
-
-              <div class="form-group">
-                <label for="kb-target-select">Target Collection</label>
-                <select id="kb-target-select" class="kb-select">
-                  <option value="">— Select a collection —</option>
-                </select>
-              </div>
-
-              <!-- Drag & Drop Zone -->
-              <div class="drop-zone" id="kb-drop-zone">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="drop-zone-icon">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                  <line x1="12" y1="18" x2="12" y2="12"/>
-                  <line x1="9" y1="15" x2="15" y2="15"/>
-                </svg>
-                <p class="drop-zone-text">Drag & drop PDF here</p>
-                <p class="drop-zone-sub">or click to browse</p>
-                <input type="file" id="kb-file-input" accept=".pdf,application/pdf" style="display:none;" multiple>
-              </div>
-
-              <!-- Upload Queue -->
-              <div id="kb-upload-queue" class="kb-upload-queue"></div>
-
-              <button class="btn btn-primary btn-full" id="btn-upload-pdfs" onclick="startPdfUpload()" disabled>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-                <span>Upload & Index PDFs</span>
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -401,7 +342,7 @@
 
   <script>
     // Configuration mapping elements and status keys
-    const serviceIds = ['webui', 'whisper', 'llamacpp', 'qdrant'];
+    const serviceIds = ['webui', 'whisper', 'llamacpp', 'qdrant', 'ragflow'];
 
     // Update status badge UI
     function updateBadge(id, isOnline) {
@@ -453,8 +394,6 @@
       
       if (tabId === 'voice') {
         loadVoiceModels();
-      } else if (tabId === 'knowledge') {
-        loadKnowledgeCollections();
       } else {
         loadModels();
       }
@@ -878,203 +817,9 @@
           });
       });
 
-      // Setup drag-and-drop PDF zone
-      setupDropZone();
     });
 
-    // -----------------------------------------------------------------------
-    // Knowledge Base Logic
-    // -----------------------------------------------------------------------
-    let kbSelectedFiles = [];
 
-    async function loadKnowledgeCollections() {
-      const listEl = document.getElementById('kb-collections-list');
-      const selectEl = document.getElementById('kb-target-select');
-      listEl.innerHTML = '<div class="kb-loading">Loading...</div>';
-
-      try {
-        const res = await fetch('/api/knowledge/list');
-        const data = await res.json();
-
-        if (data.error && data.error.includes('API key not found')) {
-          document.getElementById('kb-setup-notice').style.display = 'flex';
-          const link = document.getElementById('kb-webui-link');
-          if (link) link.href = `http://${window.location.hostname}:3000`;
-          listEl.innerHTML = '';
-          return;
-        }
-        document.getElementById('kb-setup-notice').style.display = 'none';
-
-        const collections = Array.isArray(data) ? data : (data.items || data.data || []);
-
-        listEl.innerHTML = '';
-        if (collections.length === 0) {
-          listEl.innerHTML = '<div class="kb-empty">No collections yet. Click "New Collection" to get started.</div>';
-        } else {
-          collections.forEach(kb => {
-            const fileCount = kb.files ? kb.files.length : (kb.file_count || 0);
-            const item = document.createElement('div');
-            item.className = 'model-item';
-            item.innerHTML = `
-              <div class="model-info">
-                <span class="model-title">${kb.name}</span>
-                <span class="model-meta">${fileCount} document${fileCount !== 1 ? 's' : ''}</span>
-                ${kb.description ? `<span class="model-id-text">${kb.description}</span>` : ''}
-              </div>
-              <div class="model-actions">
-                <span class="model-badge badge-active">Ready</span>
-              </div>
-            `;
-            listEl.appendChild(item);
-          });
-        }
-
-        const prevVal = selectEl.value;
-        selectEl.innerHTML = '<option value="">— Select a collection —</option>';
-        collections.forEach(kb => {
-          const opt = document.createElement('option');
-          opt.value = kb.id;
-          opt.textContent = kb.name;
-          selectEl.appendChild(opt);
-        });
-        if (prevVal) selectEl.value = prevVal;
-        updateUploadButton();
-
-      } catch (err) {
-        listEl.innerHTML = `<div class="kb-empty" style="color:#ef4444;">Failed to load: ${err.message}</div>`;
-      }
-    }
-
-    function toggleCreateKb() {
-      const form = document.getElementById('create-kb-form');
-      const isHidden = form.style.display === 'none' || form.style.display === '';
-      form.style.display = isHidden ? 'flex' : 'none';
-      if (isHidden) document.getElementById('new-kb-name').focus();
-    }
-
-    async function createKnowledgeBase() {
-      const name = document.getElementById('new-kb-name').value.trim();
-      const desc = document.getElementById('new-kb-desc').value.trim();
-      if (!name) { alert('Please enter a collection name.'); return; }
-      try {
-        const res = await fetch('/api/knowledge/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, description: desc })
-        });
-        const data = await res.json();
-        if (data.error || data.detail) { alert('Failed: ' + (data.detail || data.error)); return; }
-        document.getElementById('new-kb-name').value = '';
-        document.getElementById('new-kb-desc').value = '';
-        toggleCreateKb();
-        loadKnowledgeCollections();
-      } catch (err) { alert('Error: ' + err.message); }
-    }
-
-    function setupDropZone() {
-      const zone = document.getElementById('kb-drop-zone');
-      const fileInput = document.getElementById('kb-file-input');
-      if (!zone) return;
-      zone.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener('change', e => addFilesToQueue([...e.target.files]));
-      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-      zone.addEventListener('drop', e => {
-        e.preventDefault();
-        zone.classList.remove('drag-over');
-        const pdfs = [...e.dataTransfer.files].filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
-        if (!pdfs.length) { alert('Please drop PDF files only.'); return; }
-        addFilesToQueue(pdfs);
-      });
-      document.getElementById('kb-target-select').addEventListener('change', updateUploadButton);
-    }
-
-    function addFilesToQueue(files) {
-      files.forEach(f => {
-        if (!kbSelectedFiles.find(x => x.name === f.name && x.size === f.size)) kbSelectedFiles.push(f);
-      });
-      renderUploadQueue();
-      updateUploadButton();
-    }
-
-    function removeFromQueue(idx) {
-      kbSelectedFiles.splice(idx, 1);
-      renderUploadQueue();
-      updateUploadButton();
-    }
-
-    function renderUploadQueue() {
-      const queueEl = document.getElementById('kb-upload-queue');
-      queueEl.innerHTML = '';
-      kbSelectedFiles.forEach((f, i) => {
-        const row = document.createElement('div');
-        row.className = 'kb-queue-item';
-        row.id = `kb-queue-${i}`;
-        row.innerHTML = `
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;color:#a855f7">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-          </svg>
-          <span class="kb-queue-name">${f.name}</span>
-          <span class="kb-queue-size">${(f.size/1024/1024).toFixed(1)} MB</span>
-          <span class="kb-queue-status" id="kb-status-${i}"></span>
-          <button class="kb-queue-remove" onclick="removeFromQueue(${i})" title="Remove">&times;</button>
-        `;
-        queueEl.appendChild(row);
-      });
-    }
-
-    function updateUploadButton() {
-      const btn = document.getElementById('btn-upload-pdfs');
-      if (!btn) return;
-      btn.disabled = !(kbSelectedFiles.length > 0 && document.getElementById('kb-target-select').value !== '');
-    }
-
-    async function startPdfUpload() {
-      const knowledgeId = document.getElementById('kb-target-select').value;
-      if (!knowledgeId || kbSelectedFiles.length === 0) return;
-      const btn = document.getElementById('btn-upload-pdfs');
-      btn.disabled = true;
-      btn.querySelector('span').textContent = 'Uploading...';
-
-      let successCount = 0;
-      const failedFiles = [];
-
-      for (let i = 0; i < kbSelectedFiles.length; i++) {
-        const file = kbSelectedFiles[i];
-        const statusEl = document.getElementById(`kb-status-${i}`);
-        const rowEl = document.getElementById(`kb-queue-${i}`);
-        if (statusEl) { statusEl.textContent = '⏳'; statusEl.style.color = '#f59e0b'; }
-
-        const formData = new FormData();
-        formData.append('file', file, file.name);
-        formData.append('knowledge_id', knowledgeId);
-
-        try {
-          const res = await fetch('/api/knowledge/upload', { method: 'POST', body: formData });
-          const data = await res.json();
-          if (res.ok && data.status === 'ok') {
-            if (statusEl) { statusEl.textContent = '✅'; statusEl.style.color = '#10b981'; }
-            if (rowEl) rowEl.classList.add('kb-queue-done');
-            successCount++;
-          } else {
-            if (statusEl) { statusEl.textContent = '❌'; statusEl.style.color = '#ef4444'; }
-            failedFiles.push(i);
-          }
-        } catch (err) {
-          if (statusEl) { statusEl.textContent = '❌'; statusEl.style.color = '#ef4444'; }
-          failedFiles.push(i);
-        }
-      }
-
-      btn.querySelector('span').textContent = 'Upload & Index PDFs';
-      kbSelectedFiles = kbSelectedFiles.filter((_, i) => failedFiles.includes(i));
-
-      if (successCount > 0) {
-        setTimeout(() => { renderUploadQueue(); updateUploadButton(); loadKnowledgeCollections(); }, 1500);
-      } else {
-        updateUploadButton();
-      }
-    }
 
   </script>
 </body>

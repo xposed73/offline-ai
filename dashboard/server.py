@@ -6,7 +6,6 @@ import urllib.parse
 import urllib.error
 import threading
 import time
-import sqlite3
 import tempfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -54,147 +53,7 @@ download_status = {
     "error": None
 }
 
-# ---------------------------------------------------------------------------
-# Open WebUI auth — auto-bootstraps an admin API key from webui.db
-# ---------------------------------------------------------------------------
-_cached_token = None   # JWT or API key — whatever we have
-_token_lock = threading.Lock()
 
-def _get_admin_credentials():
-    """Return (email, password_hash) for the first admin user in webui.db."""
-    db_path = "/workspace/data/open-webui/webui.db"
-    if not os.path.exists(db_path):
-        return None, None
-    try:
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-        # Get admin user id
-        cur.execute("SELECT id, email FROM user WHERE role='admin' LIMIT 1")
-        user_row = cur.fetchone()
-        if not user_row:
-            conn.close()
-            return None, None
-        user_id, email = user_row
-        # Check for existing API key in the api_key table (new schema)
-        try:
-            cur.execute("SELECT key FROM api_key WHERE user_id=? AND (expires_at IS NULL OR expires_at=0) LIMIT 1", (user_id,))
-            key_row = cur.fetchone()
-            if key_row and key_row[0]:
-                conn.close()
-                return email, key_row[0]  # Return (email, api_key)
-        except Exception:
-            pass
-        # Fall back to auth table for credentials to get a JWT
-        cur.execute("SELECT password FROM auth WHERE id=? LIMIT 1", (user_id,))
-        auth_row = cur.fetchone()
-        conn.close()
-        if auth_row:
-            return email, None  # email found but no api_key yet; password hash not usable directly
-        return email, None
-    except Exception as e:
-        print("_get_admin_credentials error:", e)
-        return None, None
-
-def _signin_and_create_api_key():
-    """
-    Auto-create an API key for the admin user directly in webui.db,
-    using the same format Open WebUI uses: sk-{uuid4_no_dashes}
-    """
-    db_path = "/workspace/data/open-webui/webui.db"
-    try:
-        import uuid
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-        cur.execute("SELECT id, email FROM user WHERE role='admin' LIMIT 1")
-        user_row = cur.fetchone()
-        if not user_row:
-            conn.close()
-            return None
-        user_id, email = user_row
-        # Use same format as Open WebUI: sk-{uuid4_no_dashes}
-        new_key = "sk-" + str(uuid.uuid4()).replace("-", "")
-        ts = int(time.time())
-        key_id = str(uuid.uuid4()).replace("-", "")
-        # Remove any previously auto-inserted malformed keys
-        cur.execute("DELETE FROM api_key WHERE user_id=?", (user_id,))
-        cur.execute(
-            "INSERT INTO api_key (id, user_id, key, data, expires_at, last_used_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (key_id, user_id, new_key, '{}', 0, 0, ts, ts)
-        )
-        conn.commit()
-        conn.close()
-        print(f"[Dashboard] Auto-created API key for admin user {email}: {new_key[:12]}...")
-        return new_key
-    except Exception as e:
-        print("_signin_and_create_api_key error:", e)
-        return None
-
-def get_openwebui_token():
-    """Get a valid token for Open WebUI API calls. Auto-creates one if needed."""
-    global _cached_token
-    with _token_lock:
-        if _cached_token:
-            return _cached_token
-        # Step 1: check api_key table in DB
-        db_path = "/workspace/data/open-webui/webui.db"
-        if not os.path.exists(db_path):
-            return None
-        try:
-            conn = sqlite3.connect(db_path)
-            cur = conn.cursor()
-            cur.execute("SELECT id FROM user WHERE role='admin' LIMIT 1")
-            user_row = cur.fetchone()
-            if not user_row:
-                conn.close()
-                return None
-            user_id = user_row[0]
-            cur.execute("SELECT key FROM api_key WHERE user_id=? AND (expires_at IS NULL OR expires_at=0) LIMIT 1", (user_id,))
-            key_row = cur.fetchone()
-            conn.close()
-            if key_row and key_row[0]:
-                _cached_token = key_row[0]
-                return _cached_token
-        except Exception as e:
-            print("get_openwebui_token DB error:", e)
-        # Step 2: no key exists — auto-create one in DB
-        new_key = _signin_and_create_api_key()
-        if new_key:
-            _cached_token = new_key
-        return _cached_token
-
-def openwebui_request(method, path, body=None, content_type="application/json", extra_headers=None):
-    """Make an authenticated request to the Open WebUI internal API."""
-    global _cached_token
-    token = get_openwebui_token()
-    if not token:
-        raise RuntimeError("Open WebUI admin account not found. Please open Open WebUI at :3000 and create your admin account first.")
-    url = f"http://open-webui:8080{path}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "User-Agent": "Dashboard/1.0",
-    }
-    if content_type:
-        headers["Content-Type"] = content_type
-    if extra_headers:
-        headers.update(extra_headers)
-    if body and isinstance(body, dict):
-        body = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8") or '{}'
-        # If 401/403, our cached token may be stale — clear it
-        if e.code in (401, 403):
-            with _token_lock:
-                _cached_token = None
-        try:
-            return e.code, json.loads(raw)
-        except Exception:
-            return e.code, {"detail": raw}
-    except Exception as e:
-        raise RuntimeError(str(e))
 
 
 def is_model_downloaded(repo, filename):
@@ -354,7 +213,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 "webui": ping_service("http://open-webui:8080/"),
                 "whisper": ping_service("http://whisper:9000/"),
                 "llamacpp": ping_service("http://llama-cpp:8080/health"),
-                "qdrant": ping_service("http://qdrant:6333/")
+                "qdrant": ping_service("http://qdrant:6333/"),
+                "ragflow": ping_service("http://host.docker.internal:8000/")
             }
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -447,22 +307,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
                 return
 
-        # API: List Knowledge Bases
-        elif self.path == "/api/knowledge/list":
-            try:
-                status, data = openwebui_request("GET", "/api/v1/knowledge/")
-                self.send_response(status)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps(data).encode('utf-8'))
-            except Exception as e:
-                self.send_response(503)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
-            return
+
 
         # Serve static files normally
         super().do_GET()
@@ -578,141 +423,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({"status": "started"}).encode('utf-8'))
             return
 
-        # API: Create a Knowledge Base
-        elif self.path == "/api/knowledge/create":
-            try:
-                content_length = int(self.headers.get('Content-Length', 0))
-                post_data = self.rfile.read(content_length)
-                payload = json.loads(post_data.decode('utf-8'))
-                name = payload.get("name", "").strip()
-                description = payload.get("description", "").strip()
-                if not name:
-                    self._send_json(400, {"error": "name is required"})
-                    return
-                status, data = openwebui_request("POST", "/api/v1/knowledge/create", {
-                    "name": name,
-                    "description": description,
-                    "data": {}
-                })
-                self._send_json(status, data)
-            except Exception as e:
-                self._send_json(503, {"error": str(e)})
-            return
 
-        # API: Upload a PDF to a Knowledge Base
-        elif self.path == "/api/knowledge/upload":
-            try:
-                content_type = self.headers.get("Content-Type", "")
-                content_length = int(self.headers.get("Content-Length", 0))
-                raw_body = self.rfile.read(content_length)
-
-                # Parse multipart boundary
-                boundary = None
-                for part in content_type.split(";"):
-                    part = part.strip()
-                    if part.startswith("boundary="):
-                        boundary = part[len("boundary="):].strip().encode()
-                        break
-                if not boundary:
-                    self._send_json(400, {"error": "No multipart boundary found"})
-                    return
-
-                # Split parts
-                parts = raw_body.split(b"--" + boundary)
-                fields = {}
-                file_data = None
-                file_name = "upload.pdf"
-
-                for part in parts[1:]:
-                    if part in (b"--\r\n", b"--", b"\r\n"):
-                        continue
-                    header_end = part.find(b"\r\n\r\n")
-                    if header_end == -1:
-                        continue
-                    header_section = part[:header_end].decode("utf-8", errors="replace")
-                    body_section = part[header_end + 4:]
-                    # Strip trailing \r\n
-                    if body_section.endswith(b"\r\n"):
-                        body_section = body_section[:-2]
-
-                    # Parse Content-Disposition
-                    disposition = ""
-                    for line in header_section.splitlines():
-                        if line.lower().startswith("content-disposition:"):
-                            disposition = line
-                    name_val = ""
-                    filename_val = ""
-                    for token in disposition.split(";"):
-                        token = token.strip()
-                        if token.startswith("name="):
-                            name_val = token[5:].strip('"')
-                        elif token.startswith("filename="):
-                            filename_val = token[9:].strip('"')
-
-                    if filename_val:
-                        file_data = body_section
-                        file_name = filename_val
-                    else:
-                        fields[name_val] = body_section.decode("utf-8", errors="replace")
-
-                knowledge_id = fields.get("knowledge_id", "").strip()
-                if not knowledge_id:
-                    self._send_json(400, {"error": "knowledge_id field is required"})
-                    return
-                if file_data is None:
-                    self._send_json(400, {"error": "No PDF file found in request"})
-                    return
-
-                # Step 1: Upload the file to Open WebUI /files/
-                token = get_openwebui_token()
-                if not token:
-                    self._send_json(503, {"error": "Open WebUI admin account not found. Please open Open WebUI at :3000 and create your admin account first."})
-                    return
-
-                # Build multipart body to forward to Open WebUI
-                bound = b"DashboardBoundary1234567890"
-                mpart = b"--" + bound + b"\r\n"
-                mpart += f'Content-Disposition: form-data; name="file"; filename="{file_name}"\r\n'.encode()
-                mpart += b"Content-Type: application/pdf\r\n\r\n"
-                mpart += file_data + b"\r\n"
-                mpart += b"--" + bound + b"--\r\n"
-
-                upload_url = "http://open-webui:8080/api/v1/files/"
-                upload_req = urllib.request.Request(
-                    upload_url,
-                    data=mpart,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": f"multipart/form-data; boundary={bound.decode()}",
-                        "User-Agent": "Dashboard/1.0",
-                    },
-                    method="POST"
-                )
-                try:
-                    with urllib.request.urlopen(upload_req, timeout=60) as resp:
-                        file_resp = json.loads(resp.read().decode("utf-8"))
-                except urllib.error.HTTPError as e:
-                    err_body = e.read().decode("utf-8", errors="replace")
-                    self._send_json(e.code, {"error": f"File upload failed: {err_body}"})
-                    return
-
-                file_id = file_resp.get("id")
-                if not file_id:
-                    self._send_json(500, {"error": "Open WebUI did not return a file ID", "detail": file_resp})
-                    return
-
-                # Step 2: Add the file to the Knowledge Base
-                status, kb_resp = openwebui_request(
-                    "POST",
-                    f"/api/v1/knowledge/{knowledge_id}/file/add",
-                    {"file_id": file_id}
-                )
-                self._send_json(status, {"status": "ok" if status == 200 else "error", "file_id": file_id, "detail": kb_resp})
-            except Exception as e:
-                import traceback
-                print("Knowledge upload error:", traceback.format_exc())
-                self._send_json(500, {"error": str(e)})
-            return
 
         self.send_response(404)
         self.end_headers()
