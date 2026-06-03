@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <!-- Decorative Background Glows -->
@@ -245,7 +245,7 @@
             <!-- Voice Models List Card -->
             <div class="models-list-card">
               <h4>Available Voice Models</h4>
-              <p class="section-desc">Loaded offline voice models for Speech-to-Text (ASR) and Text-to-Speech (TTS).</p>
+              <p class="section-desc">Offline voice models for Speech Recognition (ASR) and Text-to-Speech (TTS). German (Deutsch) Piper voices are pre-configured as default TTS.</p>
               <div class="models-list" id="voice-models-list">
                 <!-- Rendered via JS -->
               </div>
@@ -541,33 +541,76 @@
 
     // Voice Models Manager Logic
     const popularVoiceModels = [
+      // --- Speech-to-Text (ASR) ---
       {
         id: "systran-faster-whisper-small",
-        name: "Whisper Small (ASR - Default)",
+        name: "Whisper Small (ASR - Recommended)",
         model_id: "Systran/faster-whisper-small",
         size: "465 MB",
-        type: "Speech-to-Text"
+        type: "Speech-to-Text",
+        lang: "Multilingual"
       },
       {
         id: "systran-faster-whisper-base",
         name: "Whisper Base (ASR - Fast)",
         model_id: "Systran/faster-whisper-base",
         size: "145 MB",
-        type: "Speech-to-Text"
+        type: "Speech-to-Text",
+        lang: "Multilingual"
       },
       {
         id: "systran-faster-whisper-tiny",
-        name: "Whisper Tiny (ASR - Extremely Fast)",
+        name: "Whisper Tiny (ASR - Ultralight)",
         model_id: "Systran/faster-whisper-tiny",
         size: "75 MB",
-        type: "Speech-to-Text"
+        type: "Speech-to-Text",
+        lang: "Multilingual"
       },
+      // --- TTS: English ---
       {
         id: "kokoro-tts-82m",
-        name: "Kokoro TTS 82M (Default)",
+        name: "Kokoro TTS 82M (English)",
         model_id: "speaches-ai/Kokoro-82M-v1.0-ONNX",
         size: "340 MB",
-        type: "Text-to-Speech"
+        type: "Text-to-Speech",
+        lang: "English"
+      },
+      // --- TTS: German (Deutsch) ---
+      {
+        id: "piper-de-thorsten-medium",
+        name: "Piper Thorsten (Deutsch - Medium) ⭐ Default",
+        model_id: "speaches-ai/piper-de_DE-thorsten-medium",
+        size: "63 MB",
+        type: "Text-to-Speech",
+        lang: "Deutsch 🇩🇪",
+        voice: "thorsten"
+      },
+      {
+        id: "piper-de-thorsten-high",
+        name: "Piper Thorsten (Deutsch - High Quality)",
+        model_id: "speaches-ai/piper-de_DE-thorsten-high",
+        size: "121 MB",
+        type: "Text-to-Speech",
+        lang: "Deutsch 🇩🇪",
+        voice: "thorsten"
+      },
+      {
+        id: "piper-de-kerstin-low",
+        name: "Piper Kerstin (Deutsch Female - Low)",
+        model_id: "speaches-ai/piper-de_DE-kerstin-low",
+        size: "28 MB",
+        type: "Text-to-Speech",
+        lang: "Deutsch 🇩🇪",
+        voice: "kerstin"
+      },
+      {
+        id: "piper-de-ramona-low",
+        name: "Piper Ramona (Deutsch Female - Low)",
+        model_id: "speaches-ai/piper-de_DE-ramona-low",
+        size: "28 MB",
+        type: "Text-to-Speech",
+        lang: "Deutsch 🇩🇪",
+        voice: "ramona"
       }
     ];
 
@@ -589,13 +632,16 @@
           if (isLoaded) {
             actionHtml = '<span class="model-badge badge-active">Loaded</span>';
           } else {
-            actionHtml = `<button class="btn btn-primary btn-small" id="btn-voice-${model.id}" onclick="downloadVoiceModel('${model.model_id}', 'btn-voice-${model.id}')">Download & Load</button>`;
+            actionHtml = `<button class="btn btn-primary btn-small" id="btn-voice-${model.id}" onclick="downloadVoiceModel('${model.model_id}', 'btn-voice-${model.id}')">Download &amp; Load</button>`;
           }
           
+          const langBadge = model.lang ? `<span class="lang-badge">${model.lang}</span> ` : '';
+
           item.innerHTML = `
             <div class="model-info">
               <span class="model-title">${model.name}</span>
-              <span class="model-meta">${model.type} • ${model.model_id} • ${model.size}</span>
+              <span class="model-meta">${langBadge}${model.type} &bull; ${model.size}</span>
+              <span class="model-id-text">${model.model_id}</span>
             </div>
             <div class="model-actions">
               ${actionHtml}

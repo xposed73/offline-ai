@@ -18,8 +18,8 @@ services:
       - AUDIO_TTS_ENGINE=openai
       - AUDIO_TTS_OPENAI_API_BASE_URL=http://whisper:9000/v1
       - AUDIO_TTS_OPENAI_API_KEY=dummy
-      - AUDIO_TTS_OPENAI_VOICE=af_bella
-      - AUDIO_TTS_MODEL=tts-1-hd
+      - AUDIO_TTS_OPENAI_VOICE=thorsten
+      - AUDIO_TTS_MODEL=speaches-ai/piper-de_DE-thorsten-medium
     volumes:
       - ./data/open-webui:/app/backend/data
     depends_on:
@@ -73,7 +73,7 @@ services:
       - WHISPER__COMPUTE_TYPE=int8
       - WHISPER__INFERENCE_DEVICE=cpu
       - CHAT_COMPLETION_BASE_URL=http://llama-cpp:8080/v1
-      - PRELOAD_MODELS=["Systran/faster-whisper-small", "speaches-ai/Kokoro-82M-v1.0-ONNX"]
+      - PRELOAD_MODELS=["Systran/faster-whisper-small", "speaches-ai/Kokoro-82M-v1.0-ONNX", "speaches-ai/piper-de_DE-thorsten-medium"]
       - HF_HUB_DISABLE_SYMLINKS=1
     command: uvicorn --factory speaches.main:create_app --host 0.0.0.0 --port 9000
 
