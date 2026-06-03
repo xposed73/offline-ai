@@ -35,15 +35,22 @@ services:
       - "8080:8080"
     volumes:
       - ./models:/models
-    command:
-      - -m
-      - /models/qwen3-4b-q4_k_m.gguf
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8080"
-      - --ctx-size
-      - "4096"
+    environment:
+      - LLAMA_CACHE=/models
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ -f /models/active_model.conf ]; then
+          . /models/active_model.conf
+        fi
+        REPO=$${LLAMA_HF_REPO:-bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF}
+        FILE=$${LLAMA_HF_FILE:-Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf}
+        if [ -n "$$REPO" ]; then
+          exec /app/llama-server --hf-repo "$$REPO" --hf-file "$$FILE" --host 0.0.0.0 --port 8080 --ctx-size 4096
+        else
+          exec /app/llama-server -m "/models/$$FILE" --host 0.0.0.0 --port 8080 --ctx-size 4096
+        fi
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -70,10 +77,13 @@ services:
       - HF_HUB_DISABLE_SYMLINKS=1
 
   dashboard:
-    image: nginx:alpine
+    image: python:3.11-slim
     container_name: dashboard
     restart: unless-stopped
     ports:
       - "80:80"
     volumes:
-      - ./dashboard:/usr/share/nginx/html
+      - ./:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace/dashboard
+    command: python server.py

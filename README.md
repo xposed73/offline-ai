@@ -1,17 +1,27 @@
-# offline-ai
+# Local AI Hub
 
-Offline AI assistant stack for testing.
+A fully secure, private, and offline AI assistant stack for local testing.
 
-Components:
-- Open WebUI
-- Ollama
-- Qdrant
-- Whisper STT
-- Piper TTS
+## Components
+*   **Hub Dashboard:** Simple entry page at `http://localhost/` showing status of all engines.
+*   **Chat Assistant (Open WebUI):** Modern user interface to chat with the model.
+*   **AI Inference Core (Llama.cpp):** Pre-loaded with the **Qwen3-4B-Instruct** model.
+*   **Voice Engine (Speaches):** Offline Speech-to-Text (Whisper) and Text-to-Speech (Kokoro).
+*   **Memory Database (Qdrant):** Vector database for RAG (retrieval-augmented generation).
 
-Start:
+---
 
+## How to Start
+
+You do not need to download models or configure external services manually. The stack is fully self-contained.
+
+Simply run:
+
+```bash
 docker compose up -d
+```
 
-Recommended test model:
-ollama pull qwen3:8b
+Once started:
+1.  Open your browser and navigate to: **[http://localhost](http://localhost)**
+2.  Use the **Hub Dashboard** to check that all engines are **Online**.
+3.  Click **Launch Assistant** to start chatting!
