@@ -1,0 +1,79 @@
+services:
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      - OPENAI_API_BASE_URL=http://llama-cpp:8080/v1
+      - OPENAI_API_KEY=dummy
+      - VECTOR_DB=qdrant
+      - QDRANT_URI=http://qdrant:6333
+      - AUDIO_STT_ENGINE=openai
+      - AUDIO_STT_OPENAI_API_BASE_URL=http://whisper:8000/v1
+      - AUDIO_STT_OPENAI_API_KEY=dummy
+      - AUDIO_STT_MODEL=Systran/faster-whisper-small
+      - AUDIO_TTS_ENGINE=openai
+      - AUDIO_TTS_OPENAI_API_BASE_URL=http://whisper:8000/v1
+      - AUDIO_TTS_OPENAI_API_KEY=dummy
+      - AUDIO_TTS_OPENAI_VOICE=af_bella
+      - AUDIO_TTS_MODEL=tts-1-hd
+    volumes:
+      - ./data/open-webui:/app/backend/data
+    depends_on:
+      - llama-cpp
+      - qdrant
+      - whisper
+
+  llama-cpp:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: llama-cpp
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/models
+    command:
+      - -m
+      - /models/qwen3-4b-q4_k_m.gguf
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --ctx-size
+      - "4096"
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+
+  whisper:
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
+    container_name: whisper
+    restart: unless-stopped
+    ports:
+      - "9000:8000"
+    volumes:
+      - ./data/whisper:/home/ubuntu/.cache/huggingface/hub
+    environment:
+      - WHISPER__COMPUTE_TYPE=int8
+      - WHISPER__INFERENCE_DEVICE=cpu
+      - CHAT_COMPLETION_BASE_URL=http://llama-cpp:8080/v1
+      - PRELOAD_MODELS=["Systran/faster-whisper-small", "speaches-ai/Kokoro-82M-v1.0-ONNX"]
+      - HF_HUB_DISABLE_SYMLINKS=1
+
+  dashboard:
+    image: nginx:alpine
+    container_name: dashboard
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./dashboard:/usr/share/nginx/html

@@ -1,0 +1,16 @@
+# Large model files and weights
+models/
+*.gguf
+*.bin
+
+# Runtime data and cache folders
+data/
+voices/
+
+# Environment configurations and secrets
+.env
+.webui_secret_key
+
+# OS specific files
+.DS_Store
+Thumbs.db
