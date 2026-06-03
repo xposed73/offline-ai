@@ -205,7 +205,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         if self.path == "/api/status":
             status = {
                 "webui": ping_service("http://open-webui:8080/"),
-                "whisper": ping_service("http://whisper:8000/"),
+                "whisper": ping_service("http://whisper:9000/"),
                 "llamacpp": ping_service("http://llama-cpp:8080/health"),
                 "qdrant": ping_service("http://qdrant:6333/")
             }
@@ -284,7 +284,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         # API: Query loaded voice models from Speaches
         elif self.path == "/api/voice/models":
             try:
-                req = urllib.request.Request("http://whisper:8000/v1/models", headers={"User-Agent": "Mozilla/5.0"})
+                req = urllib.request.Request("http://whisper:9000/v1/models", headers={"User-Agent": "Mozilla/5.0"})
                 with urllib.request.urlopen(req, timeout=3.0) as response:
                     data = json.loads(response.read().decode('utf-8'))
                     self.send_response(200)
@@ -396,7 +396,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 try:
                     import urllib.parse
                     encoded_model_id = urllib.parse.quote(m_id, safe="")
-                    url = f"http://whisper:8000/v1/models/{encoded_model_id}"
+                    url = f"http://whisper:9000/v1/models/{encoded_model_id}"
                     req = urllib.request.Request(url, data=b"", headers={"User-Agent": "Mozilla/5.0"}, method="POST")
                     with urllib.request.urlopen(req, timeout=600) as response:
                         print(f"Speaches download complete for {m_id}: {response.read().decode('utf-8')}")

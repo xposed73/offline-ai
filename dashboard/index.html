@@ -186,8 +186,21 @@
 
         <!-- Tabs Container -->
         <div class="tabs-container">
-          <button class="tab-btn active" id="tab-btn-llm" onclick="switchTab('llm')">AI Core Models (LLM)</button>
-          <button class="tab-btn" id="tab-btn-voice" onclick="switchTab('voice')">Voice Models (ASR/TTS)</button>
+          <div class="tab-indicator"></div>
+          <button class="tab-btn active" id="tab-btn-llm" onclick="switchTab('llm')">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <rect x="9" y="9" width="6" height="6" />
+              <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" />
+            </svg>
+            <span>AI Core Models (LLM)</span>
+          </button>
+          <button class="tab-btn" id="tab-btn-voice" onclick="switchTab('voice')">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 10v4M6 6v12M9 3v18M12 9v6M15 5v14M18 8v8M21 11v2" />
+            </svg>
+            <span>Voice Models (ASR/TTS)</span>
+          </button>
         </div>
 
         <div id="tab-llm" class="tab-pane active">
@@ -348,10 +361,22 @@
       document.getElementById(`tab-${tabId}`).style.display = 'block';
       document.getElementById(`tab-btn-${tabId}`).classList.add('active');
       
+      updateTabIndicator();
+      
       if (tabId === 'voice') {
         loadVoiceModels();
       } else {
         loadModels();
+      }
+    }
+
+    // Update active tab sliding indicator position
+    function updateTabIndicator() {
+      const activeBtn = document.querySelector('.tab-btn.active');
+      const indicator = document.querySelector('.tab-indicator');
+      if (activeBtn && indicator) {
+        indicator.style.width = `${activeBtn.offsetWidth}px`;
+        indicator.style.left = `${activeBtn.offsetLeft}px`;
       }
     }
 
@@ -484,7 +509,7 @@
           statusText.textContent = `Waiting for AI Core to load model... (${checkCount}s)`;
           
           try {
-            const res = await fetch('http://localhost:8080/health', { cache: 'no-store' });
+            const res = await fetch(`http://${window.location.hostname}:8080/health`, { cache: 'no-store' });
             if (res.status === 200) {
               const body = await res.json();
               if (body.status === 'ok') {
@@ -658,6 +683,18 @@
 
     // Initialize checking and start interval
     window.addEventListener('DOMContentLoaded', () => {
+      // Replace localhost in links with current hostname to support client PCs
+      const hostname = window.location.hostname || 'localhost';
+      document.querySelectorAll('a').forEach(link => {
+        if (link.href && link.href.includes('localhost')) {
+          link.href = link.href.replace('localhost', hostname);
+        }
+      });
+
+      // Initialize sliding tab indicator
+      setTimeout(updateTabIndicator, 50); // slight delay to ensure offsetWidth calculations are correct
+      window.addEventListener('resize', updateTabIndicator);
+
       runStatusChecks();
       setInterval(runStatusChecks, 5000); // check status every 5s
       
