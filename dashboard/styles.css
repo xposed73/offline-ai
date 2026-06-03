@@ -1001,23 +1001,25 @@ body {
   background: rgba(0,0,0,0.15);
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 12px;
-  padding: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 .create-kb-form input {
+  width: 100%;
   background: rgba(0,0,0,0.2);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   color: white;
   font-family: var(--font-family-body);
   font-size: 0.9rem;
   transition: border-color 0.3s;
 }
-.create-kb-form input:focus { outline: none; border-color: rgba(139,92,246,0.5); }
-.create-kb-actions { display: flex; gap: 8px; }
+.create-kb-form input:focus { outline: none; border-color: rgba(139,92,246,0.5); box-shadow: 0 0 8px rgba(139,92,246,0.15); }
+.create-kb-actions { display: flex; gap: 10px; }
+.create-kb-actions .btn { flex: 1; justify-content: center; }
 
 /* Select dropdown */
 .kb-select {

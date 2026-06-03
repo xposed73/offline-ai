@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
   <!-- Decorative Background Glows -->
@@ -947,8 +947,9 @@
 
     function toggleCreateKb() {
       const form = document.getElementById('create-kb-form');
-      form.style.display = form.style.display === 'none' ? 'block' : 'none';
-      if (form.style.display === 'block') document.getElementById('new-kb-name').focus();
+      const isHidden = form.style.display === 'none' || form.style.display === '';
+      form.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) document.getElementById('new-kb-name').focus();
     }
 
     async function createKnowledgeBase() {

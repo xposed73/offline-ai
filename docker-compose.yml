@@ -20,6 +20,7 @@ services:
       - AUDIO_TTS_OPENAI_API_KEY=dummy
       - AUDIO_TTS_OPENAI_VOICE=thorsten
       - AUDIO_TTS_MODEL=speaches-ai/piper-de_DE-thorsten-medium
+      - ENABLE_API_KEYS=true
     volumes:
       - ./data/open-webui:/app/backend/data
     depends_on:

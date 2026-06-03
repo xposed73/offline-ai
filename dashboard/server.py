@@ -55,44 +55,122 @@ download_status = {
 }
 
 # ---------------------------------------------------------------------------
-# Open WebUI admin API key (auto-read from webui.db)
+# Open WebUI auth — auto-bootstraps an admin API key from webui.db
 # ---------------------------------------------------------------------------
-_cached_api_key = None
-_api_key_lock = threading.Lock()
+_cached_token = None   # JWT or API key — whatever we have
+_token_lock = threading.Lock()
 
-def get_openwebui_api_key():
-    """Read the first admin user's API key from the Open WebUI SQLite database."""
-    global _cached_api_key
-    with _api_key_lock:
-        if _cached_api_key:
-            return _cached_api_key
+def _get_admin_credentials():
+    """Return (email, password_hash) for the first admin user in webui.db."""
+    db_path = "/workspace/data/open-webui/webui.db"
+    if not os.path.exists(db_path):
+        return None, None
+    try:
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        # Get admin user id
+        cur.execute("SELECT id, email FROM user WHERE role='admin' LIMIT 1")
+        user_row = cur.fetchone()
+        if not user_row:
+            conn.close()
+            return None, None
+        user_id, email = user_row
+        # Check for existing API key in the api_key table (new schema)
+        try:
+            cur.execute("SELECT key FROM api_key WHERE user_id=? AND (expires_at IS NULL OR expires_at=0) LIMIT 1", (user_id,))
+            key_row = cur.fetchone()
+            if key_row and key_row[0]:
+                conn.close()
+                return email, key_row[0]  # Return (email, api_key)
+        except Exception:
+            pass
+        # Fall back to auth table for credentials to get a JWT
+        cur.execute("SELECT password FROM auth WHERE id=? LIMIT 1", (user_id,))
+        auth_row = cur.fetchone()
+        conn.close()
+        if auth_row:
+            return email, None  # email found but no api_key yet; password hash not usable directly
+        return email, None
+    except Exception as e:
+        print("_get_admin_credentials error:", e)
+        return None, None
+
+def _signin_and_create_api_key():
+    """
+    Auto-create an API key for the admin user directly in webui.db,
+    using the same format Open WebUI uses: sk-{uuid4_no_dashes}
+    """
+    db_path = "/workspace/data/open-webui/webui.db"
+    try:
+        import uuid
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT id, email FROM user WHERE role='admin' LIMIT 1")
+        user_row = cur.fetchone()
+        if not user_row:
+            conn.close()
+            return None
+        user_id, email = user_row
+        # Use same format as Open WebUI: sk-{uuid4_no_dashes}
+        new_key = "sk-" + str(uuid.uuid4()).replace("-", "")
+        ts = int(time.time())
+        key_id = str(uuid.uuid4()).replace("-", "")
+        # Remove any previously auto-inserted malformed keys
+        cur.execute("DELETE FROM api_key WHERE user_id=?", (user_id,))
+        cur.execute(
+            "INSERT INTO api_key (id, user_id, key, data, expires_at, last_used_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (key_id, user_id, new_key, '{}', 0, 0, ts, ts)
+        )
+        conn.commit()
+        conn.close()
+        print(f"[Dashboard] Auto-created API key for admin user {email}: {new_key[:12]}...")
+        return new_key
+    except Exception as e:
+        print("_signin_and_create_api_key error:", e)
+        return None
+
+def get_openwebui_token():
+    """Get a valid token for Open WebUI API calls. Auto-creates one if needed."""
+    global _cached_token
+    with _token_lock:
+        if _cached_token:
+            return _cached_token
+        # Step 1: check api_key table in DB
         db_path = "/workspace/data/open-webui/webui.db"
         if not os.path.exists(db_path):
             return None
         try:
             conn = sqlite3.connect(db_path)
             cur = conn.cursor()
-            # Try the api_key column on the user table (Open WebUI >= 0.3)
-            cur.execute(
-                "SELECT api_key FROM user WHERE role='admin' AND api_key IS NOT NULL AND api_key != '' LIMIT 1"
-            )
-            row = cur.fetchone()
+            cur.execute("SELECT id FROM user WHERE role='admin' LIMIT 1")
+            user_row = cur.fetchone()
+            if not user_row:
+                conn.close()
+                return None
+            user_id = user_row[0]
+            cur.execute("SELECT key FROM api_key WHERE user_id=? AND (expires_at IS NULL OR expires_at=0) LIMIT 1", (user_id,))
+            key_row = cur.fetchone()
             conn.close()
-            if row and row[0]:
-                _cached_api_key = row[0]
-                return _cached_api_key
+            if key_row and key_row[0]:
+                _cached_token = key_row[0]
+                return _cached_token
         except Exception as e:
-            print("get_openwebui_api_key error:", e)
-        return None
+            print("get_openwebui_token DB error:", e)
+        # Step 2: no key exists — auto-create one in DB
+        new_key = _signin_and_create_api_key()
+        if new_key:
+            _cached_token = new_key
+        return _cached_token
 
 def openwebui_request(method, path, body=None, content_type="application/json", extra_headers=None):
     """Make an authenticated request to the Open WebUI internal API."""
-    api_key = get_openwebui_api_key()
-    if not api_key:
-        raise RuntimeError("Open WebUI admin API key not found. Log into Open WebUI at :3000 first to generate your account.")
+    global _cached_token
+    token = get_openwebui_token()
+    if not token:
+        raise RuntimeError("Open WebUI admin account not found. Please open Open WebUI at :3000 and create your admin account first.")
     url = f"http://open-webui:8080{path}"
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {token}",
         "User-Agent": "Dashboard/1.0",
     }
     if content_type:
@@ -106,9 +184,18 @@ def openwebui_request(method, path, body=None, content_type="application/json", 
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.status, json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read().decode("utf-8") or '{"detail": "HTTP Error"}')
+        raw = e.read().decode("utf-8") or '{}'
+        # If 401/403, our cached token may be stale — clear it
+        if e.code in (401, 403):
+            with _token_lock:
+                _cached_token = None
+        try:
+            return e.code, json.loads(raw)
+        except Exception:
+            return e.code, {"detail": raw}
     except Exception as e:
         raise RuntimeError(str(e))
+
 
 def is_model_downloaded(repo, filename):
     # Check flat file first
@@ -577,9 +664,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     return
 
                 # Step 1: Upload the file to Open WebUI /files/
-                api_key = get_openwebui_api_key()
-                if not api_key:
-                    self._send_json(503, {"error": "Open WebUI admin API key not found. Please log into Open WebUI at :3000 first."})
+                token = get_openwebui_token()
+                if not token:
+                    self._send_json(503, {"error": "Open WebUI admin account not found. Please open Open WebUI at :3000 and create your admin account first."})
                     return
 
                 # Build multipart body to forward to Open WebUI
@@ -595,7 +682,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     upload_url,
                     data=mpart,
                     headers={
-                        "Authorization": f"Bearer {api_key}",
+                        "Authorization": f"Bearer {token}",
                         "Content-Type": f"multipart/form-data; boundary={bound.decode()}",
                         "User-Agent": "Dashboard/1.0",
                     },
