@@ -187,10 +187,37 @@ def download_worker(repo, filename):
             except:
                 pass
 
+def ping_service(url):
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=1.0) as response:
+                return True
+        except urllib.error.HTTPError as e:
+            # 503 (loading model), 401/403/404 are still active servers
+            return e.code in [200, 204, 302, 401, 403, 404, 503]
+    except Exception:
+        return False
+
 class DashboardHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
-        # API: List models
-        if self.path == "/api/models":
+        # API: Get status of all containers
+        if self.path == "/api/status":
+            status = {
+                "webui": ping_service("http://open-webui:8080/"),
+                "whisper": ping_service("http://whisper:8000/"),
+                "llamacpp": ping_service("http://llama-cpp:8080/health"),
+                "qdrant": ping_service("http://qdrant:6333/")
+            }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps(status).encode('utf-8'))
+            return
+
+        # API: List GGUF models
+        elif self.path == "/api/models":
             env = read_env()
             active_repo = env.get("LLAMA_HF_REPO", "")
             active_file = env.get("LLAMA_HF_FILE", "")
@@ -200,7 +227,6 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             # Add popular presets
             for m in POPULAR_MODELS:
                 downloaded = is_model_downloaded(m["repo"], m["file"])
-                # It is active if the file matches. If repo is set, repo must also match.
                 is_active = (m["file"] == active_file) and (not active_repo or m["repo"] == active_repo)
                 models_list.append({
                     "id": m["id"],
@@ -217,7 +243,6 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             if os.path.isdir("/workspace/models"):
                 for f in os.listdir("/workspace/models"):
                     if f.endswith(".gguf") and not f.endswith(".downloadInProgress"):
-                        # Check if it matches any of the popular ones
                         is_preset = any(pm["file"] == f for pm in POPULAR_MODELS)
                         if not is_preset:
                             is_active = (f == active_file) and not active_repo
@@ -255,6 +280,25 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(download_status).encode('utf-8'))
             return
+
+        # API: Query loaded voice models from Speaches
+        elif self.path == "/api/voice/models":
+            try:
+                req = urllib.request.Request("http://whisper:8000/v1/models", headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=3.0) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(data).encode('utf-8'))
+                    return
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+                return
             
         # Serve static files normally
         super().do_GET()
@@ -311,7 +355,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Filename is required"}).encode('utf-8'))
                 return
                 
-            # Update .env configuration
+            # Update active_model.conf configuration
             success_env = update_env(repo, filename)
             if not success_env:
                 self.send_response(500)
@@ -332,6 +376,42 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 "env_updated": success_env,
                 "container_restarted": success_restart
             }).encode('utf-8'))
+            return
+
+        # API: Trigger download of voice model in Speaches
+        elif self.path == "/api/voice/download":
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            payload = json.loads(post_data.decode('utf-8'))
+            model_id = payload.get("model_id", "").strip()
+            
+            if not model_id:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "model_id is required"}).encode('utf-8'))
+                return
+                
+            def trigger_voice_download(m_id):
+                try:
+                    import urllib.parse
+                    encoded_model_id = urllib.parse.quote(m_id, safe="")
+                    url = f"http://whisper:8000/v1/models/{encoded_model_id}"
+                    req = urllib.request.Request(url, data=b"", headers={"User-Agent": "Mozilla/5.0"}, method="POST")
+                    with urllib.request.urlopen(req, timeout=600) as response:
+                        print(f"Speaches download complete for {m_id}: {response.read().decode('utf-8')}")
+                except Exception as e:
+                    print(f"Failed to download voice model {m_id}: {e}")
+                    
+            t = threading.Thread(target=trigger_voice_download, args=(model_id,))
+            t.daemon = True
+            t.start()
+            
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "started"}).encode('utf-8'))
             return
 
         self.send_response(404)
