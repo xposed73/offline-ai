@@ -13,9 +13,13 @@ A fully secure, private, and offline AI assistant stack for local testing.
 
 ## How to Start
 
-You do not need to download models or configure external services manually. The stack is fully self-contained.
+Before starting the services, run the installation script to download all required AI models, configuration files, and generate the patched voice executor files for offline use:
 
-Simply run:
+```bash
+python install.py
+```
+
+Once the installation has completed and all required files are downloaded, start the stack:
 
 ```bash
 docker compose up -d
