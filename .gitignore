@@ -8,8 +8,8 @@ data/
 voices/
 
 # Environment configurations and secrets
-.env
-.webui_secret_key
+# .env
+# .webui_secret_key
 
 # OS specific files
 .DS_Store
