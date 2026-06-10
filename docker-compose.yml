@@ -29,7 +29,7 @@ services:
       - whisper
 
   llama-cpp:
-    image: ghcr.io/ggml-org/llama.cpp:server
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
     container_name: llama-cpp
     restart: unless-stopped
     ports:
@@ -38,6 +38,13 @@ services:
       - ./models:/models
     environment:
       - LLAMA_CACHE=/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     entrypoint:
       - /bin/sh
       - -c
@@ -48,9 +55,9 @@ services:
         REPO=$${LLAMA_HF_REPO:-bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF}
         FILE=$${LLAMA_HF_FILE:-Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf}
         if [ -n "$$REPO" ]; then
-          exec /app/llama-server --hf-repo "$$REPO" --hf-file "$$FILE" --host 0.0.0.0 --port 8080 --ctx-size 4096
+          exec /app/llama-server --hf-repo "$$REPO" --hf-file "$$FILE" --host 0.0.0.0 --port 8080 --ctx-size 4096 --n-gpu-layers 99
         else
-          exec /app/llama-server -m "/models/$$FILE" --host 0.0.0.0 --port 8080 --ctx-size 4096
+          exec /app/llama-server -m "/models/$$FILE" --host 0.0.0.0 --port 8080 --ctx-size 4096 --n-gpu-layers 99
         fi
 
   qdrant:
@@ -217,6 +224,22 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      - N8N_ENCRYPTION_KEY=offline-key-5090
+      - N8N_USER_MANAGEMENT_DISABLED=true
+    volumes:
+      - ./data/n8n:/home/node/.n8n
 
 volumes:
   mysql_data:

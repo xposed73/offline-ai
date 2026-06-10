@@ -37,11 +37,25 @@
           <p>Secure • Private • Offline</p>
         </div>
       </div>
-      <div class="security-badge">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shield-icon">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>
-        <span>100% Local (No Internet Required)</span>
+      <div class="header-actions">
+        <!-- Language Selector -->
+        <div class="language-selector">
+          <button class="lang-btn" id="lang-btn-en" onclick="setLanguage('en')">
+            <span class="flag">🇺🇸</span>
+            <span>English</span>
+          </button>
+          <button class="lang-btn" id="lang-btn-de" onclick="setLanguage('de')">
+            <span class="flag">🇩🇪</span>
+            <span>Deutsch</span>
+          </button>
+        </div>
+
+        <div class="security-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shield-icon">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <span>100% Local (No Internet Required)</span>
+        </div>
       </div>
     </header>
 
@@ -178,6 +192,31 @@
           <p>Enterprise-grade Retrieval-Augmented Generation & Agent platform. Upload documents, extract knowledge with visual chunking, and orchestrate complex AI workflows.</p>
           <a href="http://localhost:8000" target="_blank" class="btn btn-secondary">
             <span>Launch RAGFlow</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+          </a>
+        </div>
+
+        <!-- n8n Card -->
+        <div class="service-card" id="card-n8n">
+          <div class="card-status-badge status-checking" id="badge-n8n">
+            <span class="status-dot"></span>
+            <span class="status-text">Checking</span>
+          </div>
+          <div class="service-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+          </div>
+          <h4>Automation Hub</h4>
+          <span class="service-sub">n8n Platform</span>
+          <p>Design and execute automated workflows. Connect local AI agents, trigger tasks via webhooks, and integrate document pipelines without code.</p>
+          <a href="http://localhost:5678" target="_blank" class="btn btn-secondary">
+            <span>Launch n8n</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 3 21 3 21 9"></polyline>
               <line x1="10" y1="14" x2="21" y2="3"></line>
@@ -342,7 +381,7 @@
 
   <script>
     // Configuration mapping elements and status keys
-    const serviceIds = ['webui', 'whisper', 'llamacpp', 'qdrant', 'ragflow'];
+    const serviceIds = ['webui', 'whisper', 'llamacpp', 'qdrant', 'ragflow', 'n8n'];
 
     // Update status badge UI
     function updateBadge(id, isOnline) {
@@ -568,6 +607,98 @@
       }
     }
 
+    async function loadLanguage() {
+      try {
+        const response = await fetch('/api/language');
+        const data = await response.json();
+        const activeLang = data.language || 'de';
+        
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+        const activeBtn = document.getElementById(`lang-btn-${activeLang}`);
+        if (activeBtn) activeBtn.classList.add('active');
+      } catch (error) {
+        console.error('Failed to load language:', error);
+      }
+    }
+
+    async function setLanguage(lang) {
+      const overlay = document.getElementById('restart-overlay');
+      const statusText = document.getElementById('restart-status');
+      
+      const modalTitle = overlay.querySelector('h3');
+      const modalDesc = overlay.querySelector('p');
+      
+      const originalTitle = modalTitle.textContent;
+      const originalDesc = modalDesc.textContent;
+      
+      modalTitle.textContent = 'Restarting Chat Assistant';
+      modalDesc.textContent = 'Applying language settings and reloading voice resources. This takes 5-10 seconds...';
+      
+      overlay.style.display = 'flex';
+      statusText.textContent = 'Updating system language...';
+      
+      try {
+        const response = await fetch('/api/language', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ language: lang })
+        });
+        const data = await response.json();
+        
+        if (data.error) {
+          alert('Failed to update language: ' + data.error);
+          modalTitle.textContent = originalTitle;
+          modalDesc.textContent = originalDesc;
+          overlay.style.display = 'none';
+          return;
+        }
+        
+        statusText.textContent = 'Restarting assistant container...';
+        
+        // Poll open-webui health check
+        let checkCount = 0;
+        const checkInterval = setInterval(async () => {
+          checkCount++;
+          statusText.textContent = `Waiting for Chat Assistant to boot... (${checkCount}s)`;
+          
+          try {
+            const res = await fetch(`http://${window.location.hostname}:3000/`, { cache: 'no-store' });
+            if (res.status === 200) {
+              clearInterval(checkInterval);
+              statusText.textContent = 'Language applied successfully!';
+              setTimeout(() => {
+                modalTitle.textContent = originalTitle;
+                modalDesc.textContent = originalDesc;
+                overlay.style.display = 'none';
+                loadLanguage();
+                runStatusChecks();
+              }, 1000);
+            }
+          } catch (e) {
+            // ignore connection errors
+          }
+          
+          if (checkCount > 45) {
+            clearInterval(checkInterval);
+            alert('Assistant restart timed out. Please check container status.');
+            modalTitle.textContent = originalTitle;
+            modalDesc.textContent = originalDesc;
+            overlay.style.display = 'none';
+          }
+        }, 1000);
+        
+      } catch (error) {
+        alert('Failed to change language: ' + error);
+        modalTitle.textContent = originalTitle;
+        modalDesc.textContent = originalDesc;
+        overlay.style.display = 'none';
+      }
+    }
+
     // Voice Models Manager Logic
     const popularVoiceModels = [
       // --- Speech-to-Text (ASR) ---
@@ -783,6 +914,7 @@
       setInterval(runStatusChecks, 5000); // check status every 5s
       
       loadModels();
+      loadLanguage();
       
       // Form submit GGUF download handler
       document.getElementById('custom-download-form').addEventListener('submit', (e) => {

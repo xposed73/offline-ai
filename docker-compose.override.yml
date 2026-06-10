@@ -1,0 +1,37 @@
+services:
+  llama-cpp:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    deploy: !reset null
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ -f /models/active_model.conf ]; then
+          . /models/active_model.conf
+        fi
+        FILE=$${LLAMA_HF_FILE:-Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf}
+        FILE=$$(echo "$$FILE" | tr -d '\r')
+        exec /app/llama-server -m "/models/$$FILE" --host 0.0.0.0 --port 8080 --ctx-size 4096 --n-gpu-layers 0
+
+  open-webui:
+    volumes:
+      - ./models:/models:ro
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        if [ -f /models/active_language.conf ]; then
+          . /models/active_language.conf
+        fi
+        export AUDIO_TTS_OPENAI_VOICE=$${ACTIVE_VOICE:-martin}
+        export AUDIO_TTS_MODEL=$${ACTIVE_TTS_MODEL:-Godelaune/Kokoro-82M-ONNX-German-Martin}
+        exec bash start.sh
+
+  whisper:
+    volumes:
+      - ./models:/models:ro
+      - ./data/whisper/patched_stt.py:/home/ubuntu/speaches/src/speaches/routers/stt.py:ro
+
+
+
+

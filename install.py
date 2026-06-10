@@ -67,7 +67,7 @@ conf_path = MODELS_DIR / "active_model.conf"
 if not conf_path.exists():
     print(f"Creating active model configuration: {conf_path}")
     try:
-        with open(conf_path, "w") as f:
+        with open(conf_path, "w", newline='\n') as f:
             f.write(f"LLAMA_HF_REPO={repo_id}\n")
             f.write(f"LLAMA_HF_FILE={filename}\n")
     except Exception as e:
@@ -122,12 +122,14 @@ try:
                 body = parts[2]
                 lines = front_matter.splitlines()
                 has_tags = False
+                has_library_name = False
                 tags_index = -1
                 for i, line in enumerate(lines):
                     if line.strip().startswith("tags:"):
                         has_tags = True
                         tags_index = i
-                        break
+                    elif line.strip().startswith("library_name:"):
+                        has_library_name = True
                 if has_tags:
                     insert_idx = tags_index + 1
                     lines.insert(insert_idx, "- speaches")
@@ -136,10 +138,19 @@ try:
                     lines.append("tags:")
                     lines.append("- speaches")
                     lines.append("- kokoro")
+                if not has_library_name:
+                    lines.append("library_name: onnx")
                 new_front_matter = "\n".join(lines)
-                new_content = f"---{new_front_matter}---{body}"
+                new_content = f"---\n{new_front_matter}\n---\n{body}"
                 readme_path.write_text(new_content, encoding="utf-8")
                 print("README.md patched successfully!")
+                
+    # Delete nested README.md files to prevent Speaches parsing collision
+    for sub in ["wyoming_openai_german_separator", "onnx-docker"]:
+        nested_readme = snapshot_path / sub / "README.md"
+        if nested_readme.exists():
+            print(f"Removing nested readme to prevent collision: {nested_readme}")
+            nested_readme.unlink()
 except Exception as e:
     print(f"Failed to download or configure German voice model: {e}")
 

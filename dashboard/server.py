@@ -12,6 +12,27 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 # Preconfigured popular models
 POPULAR_MODELS = [
     {
+        "id": "llama-3.3-70b-q3",
+        "name": "Llama 3.3 70B Instruct (Q3_K_M - Balanced Intelligence)",
+        "repo": "bartowski/Llama-3.3-70B-Instruct-GGUF",
+        "file": "Llama-3.3-70B-Instruct-Q3_K_M.gguf",
+        "size": "37.2 GB"
+    },
+    {
+        "id": "llama-3.3-70b-q4",
+        "name": "Llama 3.3 70B Instruct (Q4_K_M - High Precision)",
+        "repo": "bartowski/Llama-3.3-70B-Instruct-GGUF",
+        "file": "Llama-3.3-70B-Instruct-Q4_K_M.gguf",
+        "size": "42.5 GB"
+    },
+    {
+        "id": "llama-3.1-70b-q3",
+        "name": "Llama 3.1 70B Instruct (Q3_K_M - Offline Reasoning)",
+        "repo": "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
+        "file": "Meta-Llama-3.1-70B-Instruct-Q3_K_M.gguf",
+        "size": "37.2 GB"
+    },
+    {
         "id": "qwen-3-4b",
         "name": "Qwen 3 4B Instruct (Recommended)",
         "repo": "bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF",
@@ -107,22 +128,59 @@ def update_env(repo, filename):
         print("Failed to write active_model.conf:", e)
         return False
 
-def restart_llama_cpp():
+def restart_container(name):
     if not os.path.exists('/var/run/docker.sock'):
         print("Docker socket not found at /var/run/docker.sock")
         return False
     try:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.connect('/var/run/docker.sock')
-        # Send HTTP POST to Docker API to restart llama-cpp
-        request = "POST /v1.41/containers/llama-cpp/restart HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+        # Send HTTP POST to Docker API to restart container
+        request = f"POST /v1.41/containers/{name}/restart HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
         s.sendall(request.encode('utf-8'))
         response = s.recv(1024).decode('utf-8')
         s.close()
-        print("Docker restart response:", response)
+        print(f"Docker restart {name} response:", response)
         return "204 No Content" in response or "200 OK" in response
     except Exception as e:
-        print("Failed to restart container:", e)
+        print(f"Failed to restart container {name}:", e)
+        return False
+
+def restart_llama_cpp():
+    return restart_container("llama-cpp")
+
+def restart_open_webui():
+    return restart_container("open-webui")
+
+def read_active_language():
+    conf_path = "/workspace/models/active_language.conf"
+    values = {"ACTIVE_LANGUAGE": "de"}
+    if os.path.exists(conf_path):
+        try:
+            with open(conf_path, "r") as f:
+                for line in f:
+                    if "=" in line and not line.strip().startswith("#"):
+                        k, v = line.split("=", 1)
+                        values[k.strip()] = v.strip()
+        except Exception as e:
+            print("Failed to read active_language.conf:", e)
+    return values.get("ACTIVE_LANGUAGE", "de")
+
+def update_active_language(lang):
+    conf_path = "/workspace/models/active_language.conf"
+    try:
+        os.makedirs(os.path.dirname(conf_path), exist_ok=True)
+        with open(conf_path, "w", newline='\n') as f:
+            f.write(f"ACTIVE_LANGUAGE={lang}\n")
+            if lang == "en":
+                f.write("ACTIVE_VOICE=af_heart\n")
+                f.write("ACTIVE_TTS_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX\n")
+            else:
+                f.write("ACTIVE_VOICE=martin\n")
+                f.write("ACTIVE_TTS_MODEL=Godelaune/Kokoro-82M-ONNX-German-Martin\n")
+        return True
+    except Exception as e:
+        print("Failed to write active_language.conf:", e)
         return False
 
 def download_worker(repo, filename):
@@ -214,7 +272,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 "whisper": ping_service("http://whisper:9000/"),
                 "llamacpp": ping_service("http://llama-cpp:8080/health"),
                 "qdrant": ping_service("http://qdrant:6333/"),
-                "ragflow": ping_service("http://host.docker.internal:8000/")
+                "ragflow": ping_service("http://host.docker.internal:8000/"),
+                "n8n": ping_service("http://n8n:5678/")
             }
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -286,6 +345,16 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(json.dumps(download_status).encode('utf-8'))
+            return
+
+        # API: Get current active system language
+        elif self.path == "/api/language":
+            lang = read_active_language()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({"language": lang}).encode('utf-8'))
             return
 
         # API: Query loaded voice models from Speaches
@@ -421,6 +490,42 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(json.dumps({"status": "started"}).encode('utf-8'))
+            return
+
+        # API: Update system language and restart Open WebUI
+        elif self.path == "/api/language":
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            payload = json.loads(post_data.decode('utf-8'))
+            lang = payload.get("language", "de").strip()
+            
+            if lang not in ["en", "de"]:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Unsupported language. Must be 'en' or 'de'"}).encode('utf-8'))
+                return
+                
+            success_env = update_active_language(lang)
+            if not success_env:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Failed to update configuration file"}).encode('utf-8'))
+                return
+                
+            success_restart = restart_open_webui()
+            
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "status": "success",
+                "language": lang,
+                "env_updated": success_env,
+                "container_restarted": success_restart
+            }).encode('utf-8'))
             return
 
 
