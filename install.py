@@ -159,6 +159,10 @@ print("\n--- Generating Patched Speaches Utils ---")
 original_utils_path = Path("./scratch/original_utils.py")
 patched_utils_path = DATA_WHISPER_DIR / "patched_utils.py"
 
+if patched_utils_path.exists() and patched_utils_path.is_dir():
+    print(f"Removing directory {patched_utils_path} created by docker mount failure...")
+    shutil.rmtree(patched_utils_path)
+
 if not original_utils_path.exists():
     print(f"Error: Original utils script not found at {original_utils_path}. Cannot generate patched_utils.py.")
 else:
