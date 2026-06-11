@@ -183,4 +183,26 @@ else:
     except Exception as e:
         print(f"Failed to generate patched utils: {e}")
 
+# 9. Copy patched Speaches stt router
+print("\n--- Copying Patched Speaches STT Router ---")
+scratch_stt_path = Path("./scratch/patched_stt.py")
+patched_stt_path = DATA_WHISPER_DIR / "patched_stt.py"
+
+if not scratch_stt_path.exists():
+    print(f"Error: Patched STT router script not found at {scratch_stt_path}. Cannot copy it.")
+else:
+    try:
+        if patched_stt_path.exists():
+            if patched_stt_path.is_dir():
+                print(f"Removing directory {patched_stt_path} created by docker mount failure...")
+                shutil.rmtree(patched_stt_path)
+            else:
+                patched_stt_path.unlink()
+        
+        shutil.copy(scratch_stt_path, patched_stt_path)
+        print(f"Successfully copied patched STT router to {patched_stt_path}")
+    except Exception as e:
+        print(f"Failed to copy patched STT router: {e}")
+
 print("\nInstallation/Setup completed! You can now start the stack with 'docker compose up -d'.")
+
